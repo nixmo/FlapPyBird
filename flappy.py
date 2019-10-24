@@ -1,9 +1,19 @@
 from itertools import cycle
 import random
 import sys
+import time
 
 import pygame
 from pygame.locals import *
+
+import argparse
+import os
+
+'''
+TODO:
+- implement escape enabled debug mode via argparse
+
+'''
 
 
 FPS = 30
@@ -54,13 +64,62 @@ try:
 except NameError:
     xrange = range
 
+# new
+TIME_MINIMUM = 30
+TIME_LIMIT = 60
+START_TIME = time.time()
+
+LOG_FPATH = None
+LOG_FILE = None
+
+def log(string):
+    LOG_FILE.write(string + "\n")
+    LOG_FILE.flush()
+    
+RENDER_RECT = pygame.rect=(0, 0, SCREENWIDTH, SCREENHEIGHT)
 
 def main():
-    global SCREEN, FPSCLOCK
+    global RENDER_RECT
+    global SCREEN, FPSCLOCK, FULLSCREEN
+    global font, text, textRect
     pygame.init()
+    pygame.font.init()
     FPSCLOCK = pygame.time.Clock()
-    SCREEN = pygame.display.set_mode((SCREENWIDTH, SCREENHEIGHT))
+    # SCREEN = pygame.display.set_mode((SCREENWIDTH, SCREENHEIGHT), (pygame.FULLSCREEN | pygame.NOFRAME))
+    # SCREEN = pygame.display.set_mode((SCREENWIDTH, SCREENHEIGHT), (pygame.NOFRAME))
+    # SCREEN = pygame.display.set_mode((SCREENWIDTH, SCREENHEIGHT), (pygame.FULLSCREEN))
+    # SCREEN = pygame.display.set_mode((1680, 1050), (pygame.FULLSCREEN))
+    
+    # FULLSCREEN = pygame.display.set_mode((1680, 1050), (pygame.FULLSCREEN))
+    mode = pygame.display.list_modes()[0]
+    FULLSCREEN = pygame.display.set_mode(mode, (pygame.FULLSCREEN))
+    SCREEN = pygame.Surface((SCREENWIDTH, SCREENHEIGHT))
+    
+    # print(mode)
+    # print(RENDER_RECT)
+    RENDER_RECT = pygame.rect=(mode[0]//2-SCREENWIDTH//2, mode[1]//2-SCREENHEIGHT//2, SCREENWIDTH, SCREENHEIGHT)
+    # print(RENDER_RECT)
+
+
+    # FULLSCREEN = pygame.display.set_mode((1680, 1050), pygame.FULLSCREEN)
+    # SCREEN = pygame.display.set_mode((SCREENWIDTH, SCREENHEIGHT))
+
     pygame.display.set_caption('Flappy Bird')
+    
+    # log(pygame.display.list_modes())
+    
+        
+
+    # font = pygame.font.Font('freesansbold.ttf', 12) 
+    # INSTRUCTION_FONT = pygame.font.Font('freesansbold.ttf', 12) 
+    
+    # text = font.render('Sie können jetzt die Escape-Taste drücken, wenn Sie früher aufhören möchten. Die nächste Aufgabe dauert dann aber länger.', True, (0, 0, 0) ) 
+
+    # textRect = text.get_rect()  
+      
+      
+    # textRect.center = (SCREENWIDTH // 2, SCREENHEIGHT // 2) 
+
 
     # numbers sprites for score display
     IMAGES['numbers'] = (
@@ -94,8 +153,11 @@ def main():
     SOUNDS['point']  = pygame.mixer.Sound('assets/audio/point' + soundExt)
     SOUNDS['swoosh'] = pygame.mixer.Sound('assets/audio/swoosh' + soundExt)
     SOUNDS['wing']   = pygame.mixer.Sound('assets/audio/wing' + soundExt)
-
+    
     while True:
+        if time.time()-START_TIME >= TIME_LIMIT:
+            flappyquit("TIME_OUT")
+        
         # select random background sprites
         randBg = random.randint(0, len(BACKGROUNDS_LIST) - 1)
         IMAGES['background'] = pygame.image.load(BACKGROUNDS_LIST[randBg]).convert()
@@ -135,6 +197,7 @@ def main():
 
 
 def showWelcomeAnimation():
+    log("%.7f,RESTART" % time.time())
     """Shows welcome screen animation of flappy bird"""
     # index of player to blit on screen
     playerIndex = 0
@@ -156,11 +219,15 @@ def showWelcomeAnimation():
     playerShmVals = {'val': 0, 'dir': 1}
 
     while True:
+        if time.time()-START_TIME >= TIME_LIMIT:
+            flappyquit("TIME_OUT")
+        
         for event in pygame.event.get():
             if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
-                pygame.quit()
-                sys.exit()
-            if event.type == KEYDOWN and (event.key == K_SPACE or event.key == K_UP):
+                if time.time()-START_TIME >= TIME_MINIMUM:
+                    flappyquit("ESCAPE_PRESSED")
+            if event.type == KEYDOWN and (event.key == K_UP):
+                log("%.7f,FLAPPED_STARTED" % time.time())
                 # make first flap sound and return values for mainGame
                 SOUNDS['wing'].play()
                 return {
@@ -183,8 +250,58 @@ def showWelcomeAnimation():
         SCREEN.blit(IMAGES['message'], (messagex, messagey))
         SCREEN.blit(IMAGES['base'], (basex, BASEY))
 
-        pygame.display.update()
+        if time.time()-START_TIME >= TIME_MINIMUM:
+            drawText("Sie können jetzt die Escape-Taste drücken, wenn Sie früher aufhören möchten. Die nächste Aufgabe dauert dann aber länger.")
+        
+        # pygame.Surface.blit(source=SCREEN, dest=FULLSCREEN)
+        # w, h = pygame.display.get_surface().get_size()
+        # FULLSCREEN.blit(SCREEN, (w//2-SCREENWIDTH//2, h//2-SCREENHEIGHT//2))
+        # print(RENDER_RECT)
+        FULLSCREEN.blit(SCREEN, RENDER_RECT)
+        pygame.display.update(RENDER_RECT)
         FPSCLOCK.tick(FPS)
+        
+offset = 10
+def drawText(text, color=(0, 0, 0), rect=(0+offset, 426+offset, SCREENWIDTH-2*offset, SCREENHEIGHT-426-2*offset), aa=True, bkg=None):
+    
+    font = pygame.font.Font('freesansbold.ttf', 16)
+
+    rect = pygame.Rect(rect)
+    y = rect.top
+    lineSpacing = -2
+
+    # get the height of the font
+    fontHeight = font.size("Tg")[1]
+
+    while text:
+        i = 1
+
+        # determine if the row of text will be outside our area
+        if y + fontHeight > rect.bottom:
+            break
+
+        # determine maximum width of line
+        while font.size(text[:i])[0] < rect.width and i < len(text):
+            i += 1
+
+        # if we've wrapped the text, then adjust the wrap to the last word      
+        if i < len(text): 
+            i = text.rfind(" ", 0, i) + 1
+
+        # render the line and blit it to the SCREEN
+        if bkg:
+            image = font.render(text[:i], 1, color, bkg)
+            image.set_colorkey(bkg)
+        else:
+            image = font.render(text[:i], aa, color)
+
+        SCREEN.blit(image, (rect.left, y))
+        y += fontHeight + lineSpacing
+
+        # remove the text we just blitted
+        text = text[i:]
+
+    return text
 
 
 def mainGame(movementInfo):
@@ -226,12 +343,17 @@ def mainGame(movementInfo):
 
 
     while True:
+        if time.time()-START_TIME >= TIME_LIMIT:
+            flappyquit("TIME_OUT")
+        
         for event in pygame.event.get():
             if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
-                pygame.quit()
-                sys.exit()
-            if event.type == KEYDOWN and (event.key == K_SPACE or event.key == K_UP):
+                if time.time()-START_TIME >= TIME_MINIMUM:
+                    flappyquit("ESCAPE_PRESSED")
+                
+            if event.type == KEYDOWN and (event.key == K_UP):
                 if playery > -2 * IMAGES['player'][0].get_height():
+                    log("%.7f,FLAPPED" % time.time())
                     playerVelY = playerFlapAcc
                     playerFlapped = True
                     SOUNDS['wing'].play()
@@ -240,6 +362,7 @@ def mainGame(movementInfo):
         crashTest = checkCrash({'x': playerx, 'y': playery, 'index': playerIndex},
                                upperPipes, lowerPipes)
         if crashTest[0]:
+            log("%.7f,CRASHED=%d" % (time.time(), score))
             return {
                 'y': playery,
                 'groundCrash': crashTest[1],
@@ -257,6 +380,7 @@ def mainGame(movementInfo):
             pipeMidPos = pipe['x'] + IMAGES['pipe'][0].get_width() / 2
             if pipeMidPos <= playerMidPos < pipeMidPos + 4:
                 score += 1
+                log("%.7f,SCORE=%d" % (time.time(), score))
                 SOUNDS['point'].play()
 
         # playerIndex basex change
@@ -316,7 +440,15 @@ def mainGame(movementInfo):
         playerSurface = pygame.transform.rotate(IMAGES['player'][playerIndex], visibleRot)
         SCREEN.blit(playerSurface, (playerx, playery))
 
-        pygame.display.update()
+        if time.time()-START_TIME >= TIME_MINIMUM:
+            drawText("Sie können jetzt die Escape-Taste drücken, wenn Sie früher aufhören möchten. Die nächste Aufgabe dauert dann aber länger.")
+        
+        # pygame.Surface.blit(source=SCREEN, dest=FULLSCREEN)
+        # w, h = pygame.display.get_surface().get_size()
+        # FULLSCREEN.blit(SCREEN, (w//2-SCREENWIDTH//2, h//2-SCREENHEIGHT//2))
+        # print(RENDER_RECT)
+        FULLSCREEN.blit(SCREEN, RENDER_RECT)
+        pygame.display.update(RENDER_RECT)
         FPSCLOCK.tick(FPS)
 
 
@@ -341,12 +473,17 @@ def showGameOverScreen(crashInfo):
         SOUNDS['die'].play()
 
     while True:
+        if time.time()-START_TIME >= TIME_LIMIT:
+            flappyquit("TIME_OUT")
+        
         for event in pygame.event.get():
             if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
-                pygame.quit()
-                sys.exit()
-            if event.type == KEYDOWN and (event.key == K_SPACE or event.key == K_UP):
+                if time.time()-START_TIME >= TIME_MINIMUM:
+                    flappyquit("ESCAPE_PRESSED")
+            
+            if event.type == KEYDOWN and (event.key == K_UP):
                 if playery + playerHeight >= BASEY - 1:
+                    log("%.7f,STARTED" % time.time())
                     return
 
         # player y shift
@@ -379,8 +516,16 @@ def showGameOverScreen(crashInfo):
         SCREEN.blit(playerSurface, (playerx,playery))
         SCREEN.blit(IMAGES['gameover'], (50, 180))
 
+        if time.time()-START_TIME >= TIME_MINIMUM:
+            drawText("Sie können jetzt die Escape-Taste drücken, wenn Sie früher aufhören möchten. Die nächste Aufgabe dauert dann aber länger.")
+        
+        # pygame.Surface.blit(source=SCREEN, dest=FULLSCREEN)
+        # w, h = pygame.display.get_surface().get_size()
+        # FULLSCREEN.blit(SCREEN, (w//2-SCREENWIDTH//2, h//2-SCREENHEIGHT//2))
+        # print(RENDER_RECT)
+        FULLSCREEN.blit(SCREEN, RENDER_RECT)
+        pygame.display.update(RENDER_RECT)
         FPSCLOCK.tick(FPS)
-        pygame.display.update()
 
 
 def playerShm(playerShm):
@@ -482,6 +627,31 @@ def getHitmask(image):
         for y in xrange(image.get_height()):
             mask[x].append(bool(image.get_at((x,y))[3]))
     return mask
+    
+def flappyquit(reason=None):
+    if reason is None:
+        reason = "NO_REASON_GIVEN"
+    
+    log("%.7f,QUIT,%s" % (time.time(), reason))
+    
+    pygame.quit()
+    sys.exit()
 
 if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser(description='Flappy Bird in pygame.')
+    parser.add_argument(
+        "--log_fpath",
+        type=str,
+        default=os.path.join(os.path.dirname(os.path.realpath(__file__)), "flappy.log"),
+        help="Path to the log file",
+    )
+
+    args = parser.parse_args()
+    
+    LOG_FPATH = args.log_fpath
+    LOG_FILE = open(LOG_FPATH, "a+")
+    
+    log("%.7f,INITIALIZED" % time.time())
+
     main()
