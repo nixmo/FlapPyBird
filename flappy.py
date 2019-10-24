@@ -11,7 +11,7 @@ import os
 
 '''
 TODO:
-- implement escape enabled debug mode via argparse
+- localize instruction
 
 '''
 
@@ -65,17 +65,19 @@ except NameError:
     xrange = range
 
 # new
-TIME_MINIMUM = 30
-TIME_LIMIT = 60
+TIME_MINIMUM = None
+TIME_LIMIT = None
 START_TIME = time.time()
 
-LOG_FPATH = None
+LOG_FPATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), "flappy.log")
 LOG_FILE = None
+ 
+CANCELABLE = False
 
 def log(string):
     LOG_FILE.write(string + "\n")
     LOG_FILE.flush()
-    
+   
 RENDER_RECT = pygame.rect=(0, 0, SCREENWIDTH, SCREENHEIGHT)
 
 def main():
@@ -83,7 +85,8 @@ def main():
     global SCREEN, FPSCLOCK, FULLSCREEN
     global font, text, textRect
     pygame.init()
-    pygame.font.init()
+    pygame.mouse.set_visible(False)
+
     FPSCLOCK = pygame.time.Clock()
     # SCREEN = pygame.display.set_mode((SCREENWIDTH, SCREENHEIGHT), (pygame.FULLSCREEN | pygame.NOFRAME))
     # SCREEN = pygame.display.set_mode((SCREENWIDTH, SCREENHEIGHT), (pygame.NOFRAME))
@@ -155,7 +158,7 @@ def main():
     SOUNDS['wing']   = pygame.mixer.Sound('assets/audio/wing' + soundExt)
     
     while True:
-        if time.time()-START_TIME >= TIME_LIMIT:
+        if TIME_LIMIT is not None and time.time()-START_TIME >= TIME_LIMIT:
             flappyquit("TIME_OUT")
         
         # select random background sprites
@@ -219,12 +222,12 @@ def showWelcomeAnimation():
     playerShmVals = {'val': 0, 'dir': 1}
 
     while True:
-        if time.time()-START_TIME >= TIME_LIMIT:
+        if TIME_LIMIT is not None and time.time()-START_TIME >= TIME_LIMIT:
             flappyquit("TIME_OUT")
         
         for event in pygame.event.get():
             if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
-                if time.time()-START_TIME >= TIME_MINIMUM:
+                if (TIME_MINIMUM is not None and time.time()-START_TIME >= TIME_MINIMUM) or CANCELABLE == True:
                     flappyquit("ESCAPE_PRESSED")
             if event.type == KEYDOWN and (event.key == K_UP):
                 log("%.7f,FLAPPED_STARTED" % time.time())
@@ -250,7 +253,7 @@ def showWelcomeAnimation():
         SCREEN.blit(IMAGES['message'], (messagex, messagey))
         SCREEN.blit(IMAGES['base'], (basex, BASEY))
 
-        if time.time()-START_TIME >= TIME_MINIMUM:
+        if TIME_MINIMUM is not None and time.time()-START_TIME >= TIME_MINIMUM:
             drawText("Sie können jetzt die Escape-Taste drücken, wenn Sie früher aufhören möchten. Die nächste Aufgabe dauert dann aber länger.")
         
         # pygame.Surface.blit(source=SCREEN, dest=FULLSCREEN)
@@ -343,12 +346,12 @@ def mainGame(movementInfo):
 
 
     while True:
-        if time.time()-START_TIME >= TIME_LIMIT:
+        if TIME_LIMIT is not None and time.time()-START_TIME >= TIME_LIMIT:
             flappyquit("TIME_OUT")
         
         for event in pygame.event.get():
             if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
-                if time.time()-START_TIME >= TIME_MINIMUM:
+                if (TIME_MINIMUM is not None and time.time()-START_TIME >= TIME_MINIMUM) or CANCELABLE == True:
                     flappyquit("ESCAPE_PRESSED")
                 
             if event.type == KEYDOWN and (event.key == K_UP):
@@ -440,7 +443,7 @@ def mainGame(movementInfo):
         playerSurface = pygame.transform.rotate(IMAGES['player'][playerIndex], visibleRot)
         SCREEN.blit(playerSurface, (playerx, playery))
 
-        if time.time()-START_TIME >= TIME_MINIMUM:
+        if TIME_MINIMUM is not None and time.time()-START_TIME >= TIME_MINIMUM:
             drawText("Sie können jetzt die Escape-Taste drücken, wenn Sie früher aufhören möchten. Die nächste Aufgabe dauert dann aber länger.")
         
         # pygame.Surface.blit(source=SCREEN, dest=FULLSCREEN)
@@ -473,12 +476,12 @@ def showGameOverScreen(crashInfo):
         SOUNDS['die'].play()
 
     while True:
-        if time.time()-START_TIME >= TIME_LIMIT:
+        if TIME_LIMIT is not None and time.time()-START_TIME >= TIME_LIMIT:
             flappyquit("TIME_OUT")
         
         for event in pygame.event.get():
             if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
-                if time.time()-START_TIME >= TIME_MINIMUM:
+                if (TIME_MINIMUM is not None and time.time()-START_TIME >= TIME_MINIMUM) or CANCELABLE == True:
                     flappyquit("ESCAPE_PRESSED")
             
             if event.type == KEYDOWN and (event.key == K_UP):
@@ -516,7 +519,7 @@ def showGameOverScreen(crashInfo):
         SCREEN.blit(playerSurface, (playerx,playery))
         SCREEN.blit(IMAGES['gameover'], (50, 180))
 
-        if time.time()-START_TIME >= TIME_MINIMUM:
+        if TIME_MINIMUM is not None and time.time()-START_TIME >= TIME_MINIMUM:
             drawText("Sie können jetzt die Escape-Taste drücken, wenn Sie früher aufhören möchten. Die nächste Aufgabe dauert dann aber länger.")
         
         # pygame.Surface.blit(source=SCREEN, dest=FULLSCREEN)
@@ -634,24 +637,50 @@ def flappyquit(reason=None):
     
     log("%.7f,QUIT,%s" % (time.time(), reason))
     
+    LOG_FILE.close()
+    
     pygame.quit()
     sys.exit()
 
 if __name__ == '__main__':
-
     parser = argparse.ArgumentParser(description='Flappy Bird in pygame.')
+    parser.add_argument(
+        "--timelimit",
+        type=int,
+        help="Number of seconds after which the process will automatically terminate.",
+    )
+    parser.add_argument(
+        "--timeminimum",
+        type=int,
+        help="Number of seconds the player must play before they may quit.",
+    )
     parser.add_argument(
         "--log_fpath",
         type=str,
-        default=os.path.join(os.path.dirname(os.path.realpath(__file__)), "flappy.log"),
         help="Path to the log file",
     )
-
+    parser.add_argument(
+        "--cancelable",
+        type=str,
+        help="If set to anything, will allow stopping the game by pressing the Escape key.",
+    )
+    
     args = parser.parse_args()
     
-    LOG_FPATH = args.log_fpath
+    if args.timelimit:
+        TIME_LIMIT = args.timelimit
+    
+    if args.timeminimum:
+        TIME_MINIMUM = args.timeminimum
+    
+    if args.log_fpath:
+        LOG_FPATH = args.log_fpath
     LOG_FILE = open(LOG_FPATH, "a+")
     
+    if args.cancelable:
+        CANCELABLE = True
+    
     log("%.7f,INITIALIZED" % time.time())
-
+    
     main()
+    
