@@ -3,7 +3,7 @@ FlapPyBird
 
 This fork is modified to be usable in laboratory experiments with human subjects.
 
-Modifications:
+**Modifications:**
 - The game runs in fullscreen mode (centered, with black bars on all four sides)
 - Ingame events will be logged to a text file (by default `flappy.log`) with time stamps
 - To homogenize input, only <kbd>&uarr;</kbd> is accepted as input (<kbd>Space</kbd> was removed)
