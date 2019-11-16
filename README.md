@@ -17,7 +17,7 @@ Modifications:
    
    `--log_fpath` can be used to pass a path to a log file that should be used instead of the default `flappy.log`. Python will attempt to open this in `a+` mode.
    
-## Usage
+## Example Usage
 
 For example, to run this fork with a timelimit of 5 minutes, use:
 
