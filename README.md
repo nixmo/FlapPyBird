@@ -16,6 +16,8 @@ Modifications:
    If a number is passed through the `--timeminimum` argument, the player will be able to prematurely quit the game after that amount of seconds by pressing <kbd>Esc</kbd>. A message will appear onscreen informing the player of that fact. This message is currently hardcoded in german. This functionality is implemented for experiments in which concepts such as *giving up*, *rage-quitting*, *disengagement* or similar are of interest.
    
    `--log_fpath` can be used to pass a path to a log file that should be used instead of the default `flappy.log`. Python will attempt to open this in `a+` mode.
+   
+## Usage
 
 For example, to run this fork with a timelimit of 5 minutes, use:
 
