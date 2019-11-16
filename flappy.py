@@ -661,8 +661,8 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         "--cancelable",
-        type=str,
-        help="If set to anything, will allow stopping the game by pressing the Escape key.",
+        action="store_true",
+        help="If set, will allow stopping the game by pressing the Escape key.",
     )
     
     args = parser.parse_args()
@@ -677,7 +677,7 @@ if __name__ == '__main__':
         LOG_FPATH = args.log_fpath
     LOG_FILE = open(LOG_FPATH, "a+")
     
-    if args.cancelable:
+    if args.cancelable or args.timelimit is None:
         CANCELABLE = True
     
     log("%.7f,INITIALIZED" % time.time())
